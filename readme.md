@@ -64,4 +64,4 @@ I want the system to use a genetic algorithm to find the best location of the 3d
 
 4. **Accessed the web application** through the local web server provided by Parcel (usually `http://localhost:1234`).
 
-With this setup, you were able to create a web application that uses Three.js for rendering 3D graphics in the browser, all while utilizing modern JavaScript modules and a module bundler to streamline development and testing.
+![Alt text]('naturemorte/snap_v1.png')
