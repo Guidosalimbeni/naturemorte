@@ -6,7 +6,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#838572");
 
 const camera = new THREE.PerspectiveCamera(
-  75,
+  25,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
@@ -34,7 +34,8 @@ stage.position.y = -0.5;
 stage.receiveShadow = true; // Enable shadow receiving
 scene.add(stage);
 
-camera.position.z = 2.1;
+camera.position.z = 5;
+camera.position.y = 0.2;
 
 const objects = []; // Array to hold uploaded models
 
@@ -69,6 +70,9 @@ document
 document
   .getElementById("optimizeBtn")
   .addEventListener("click", startOptimization);
+// Assuming you have a div with the class 'canvas-container' in your HTML
+const canvasContainer = document.querySelector(".canvas-container");
+canvasContainer.appendChild(renderer.domElement);
 
 function adjustObjectPositionAndRotation() {
   // Placeholder for AI_artist function
