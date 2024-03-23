@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { GA } from "./decision_engine.js";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#838572");
@@ -65,6 +66,10 @@ document
     }
   });
 
+document
+  .getElementById("optimizeBtn")
+  .addEventListener("click", startOptimization);
+
 function adjustObjectPositionAndRotation() {
   // Placeholder for AI_artist function
   // This function will iterate over 'objects' and adjust each object based on AI_artist's output
@@ -93,3 +98,37 @@ function render() {
 render();
 
 window.objects = objects; // Make it accessible globally for debugging
+
+function startOptimization() {
+  const currentObjects = objects.map((obj) => {
+    // Assuming 'objects' is an array holding your scene's objects
+    return {
+      x: obj.position.x,
+      y: obj.position.y,
+      z: obj.position.z,
+      rotation: obj.rotation.y, // Considering rotation around y-axis
+    };
+  });
+
+  // Initialize the GA with the current number of objects
+  const geneLength = currentObjects.length;
+  GA.initializePopulation(geneLength);
+
+  // Example: Run the GA for a fixed number of generations
+  const numberOfGenerations = 20; // You can adjust this number
+  for (let i = 0; i < numberOfGenerations; i++) {
+    GA.calculateFitness();
+    GA.generateNextGeneration();
+  }
+
+  // Apply the best solution from the GA to the scene objects
+  const bestSolution = GA.population[0]; // Assuming the first individual is the best
+  for (let i = 0; i < objects.length; i++) {
+    objects[i].position.x = bestSolution[i].x;
+    objects[i].position.y = bestSolution[i].y;
+    objects[i].position.z = bestSolution[i].z;
+    objects[i].rotation.y = bestSolution[i].rotation;
+  }
+
+  render(); // Re-render the scene with updated object positions
+}

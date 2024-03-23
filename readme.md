@@ -64,4 +64,4 @@ I want the system to use a genetic algorithm to find the best location of the 3d
 
 4. **Accessed the web application** through the local web server provided by Parcel (usually `http://localhost:1234`).
 
-![Alt text]('naturemorte/snap_v1.png')
+![Alt text]('/snap_v1.png')
