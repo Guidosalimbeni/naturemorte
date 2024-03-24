@@ -1,0 +1,345 @@
+I am implementing an app that shows a picture frame and the user can upload 3d objects and then clic on a buttom to run a optimisation that will take all the objects uploaded and move on the stage to find the best composition.
+
+it works by using a genetic algorithm 
+
+there are 4 files:
+
+app.js is the main file and orchestrate the scene and pass the render to the decision engine
+
+decision_engine.js is the file holding the genetic algorithm and uses the balance.js as the fitted function value
+
+balance.js calculate the balance of the image lef right in terms of pixels values. It is a simple one and I am envisioning to implement more but this can work for the initial mvp
+
+index.html is the file that displays the buttons and the renders
+
+app.js
+
+import * as THREE from "three";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { GA } from "./decision_engine.js";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#838572");
+
+const camera = new THREE.PerspectiveCamera(
+  25,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+// Set the aspect ratio to match A4 landscape
+const aspectRatio = 297 / 210; // A4 landscape
+camera.aspect = aspectRatio;
+camera.updateProjectionMatrix();
+const renderer = new THREE.WebGLRenderer();
+// For a production environment, consider dynamically adjusting based on the viewport or using CSS.
+const width = 400; // Arbitrary width, adjust as needed
+const height = width / aspectRatio;
+renderer.setSize(width, height);
+// renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Default is THREE.PCFShadowMap
+
+document.body.appendChild(renderer.domElement);
+
+const stageGeometry = new THREE.BoxGeometry(6, 0.2, 3);
+const stageMaterial = new THREE.MeshPhongMaterial({ color: "#ebdfb9" }); // White-grey material
+
+const stage = new THREE.Mesh(stageGeometry, stageMaterial);
+stage.position.y = -0.5;
+stage.receiveShadow = true; // Enable shadow receiving
+scene.add(stage);
+
+camera.position.z = 5;
+camera.position.y = 0.2;
+
+const objects = []; // Array to hold uploaded models
+
+function loadModel(url) {
+  const loader = new OBJLoader();
+  loader.load(url, function (object) {
+    const material = new THREE.MeshPhongMaterial({ color: "#f0efe6" }); // White-grey material
+    object.traverse(function (child) {
+      if (child.isMesh) {
+        child.material = material;
+        child.castShadow = true; // Enable shadow casting
+        child.receiveShadow = true; // Objects can receive shadows as well
+      }
+    });
+    object.position.set(0, -0.5, 1); // Default position
+    scene.add(object);
+    objects.push(object); // Add to objects array for tracking
+    render();
+  });
+}
+
+document
+  .getElementById("fileInput")
+  .addEventListener("change", function (event) {
+    const files = event.target.files;
+    for (const file of files) {
+      const url = URL.createObjectURL(file);
+      loadModel(url);
+    }
+  });
+
+document
+  .getElementById("optimizeBtn")
+  .addEventListener("click", startOptimization);
+// Assuming you have a div with the class 'canvas-container' in your HTML
+const canvasContainer = document.querySelector(".canvas-container");
+canvasContainer.appendChild(renderer.domElement);
+
+const light = new THREE.DirectionalLight(0xffffff, 3);
+light.position.set(-3, 2, 3);
+light.castShadow = true; // Enable shadow casting for the light
+light.shadow.mapSize.width = 512; // Default is 512; higher values mean better shadow quality
+light.shadow.mapSize.height = 512; // Default is 512
+light.shadow.camera.near = 0.5; // Default is 0.5
+light.shadow.camera.far = 500; // Default is 500
+light.shadow.darkness = 0.5; // Adjust the darkness of the shadow [Deprecated in r128]
+
+scene.add(light);
+
+const ambientLight = new THREE.AmbientLight("#dedcce", 0.5); // Soft light with background color
+scene.add(ambientLight);
+
+const hemiLight = new THREE.HemisphereLight(0xffffff, "#838572", 0.5);
+scene.add(hemiLight);
+
+function render() {
+  renderer.render(scene, camera);
+}
+render();
+
+function captureWebGLPixelData() {
+  const width = renderer.domElement.width;
+  const height = renderer.domElement.height;
+  const pixels = new Uint8Array(width * height * 4); // 4 components per pixel
+  renderer
+    .getContext()
+    .readPixels(
+      0,
+      0,
+      width,
+      height,
+      renderer.getContext().RGBA,
+      renderer.getContext().UNSIGNED_BYTE,
+      pixels
+    );
+  return { data: pixels, width, height };
+}
+
+async function startOptimization() {
+  const currentObjects = objects.map((obj) => {
+    // Assuming 'objects' is an array holding your scene's objects
+    return {
+      x: obj.position.x,
+      y: obj.position.y,
+      z: obj.position.z,
+      rotation: obj.rotation.y, // Considering rotation around y-axis
+    };
+  });
+
+  // Initialize the GA with the current number of objects
+  const geneLength = currentObjects.length;
+  GA.initializePopulation(geneLength);
+
+  render(); // Make sure your scene is rendered
+  // Capture pixel data from WebGL
+  const imageData = captureWebGLPixelData();
+
+  const numberOfGenerations = 200; // You can adjust this number
+  for (let i = 0; i < numberOfGenerations; i++) {
+    // Render the scene with current object positions before calculating fitness
+    render(); // Make sure this renders the scene based on the current GA population
+    await GA.calculateFitness(imageData); // Pass the canvas for balance score calculation
+    GA.generateNextGeneration();
+  }
+
+  // Apply the best solution from the GA to the scene objects
+  const bestSolution = GA.population[0]; // Assuming the first individual is the best
+  for (let i = 0; i < objects.length; i++) {
+    objects[i].position.x = bestSolution[i].x;
+    objects[i].position.y = bestSolution[i].y;
+    objects[i].position.z = bestSolution[i].z;
+    objects[i].rotation.y = bestSolution[i].rotation;
+  }
+
+  render(); // Re-render the scene with updated object positions
+}
+
+decision_engine.js
+import { calculateBalanceScore } from "./balance.js";
+
+class GeneticAlgorithm {
+  constructor(populationSize) {
+    this.populationSize = populationSize;
+    this.population = [];
+    this.fitnessScores = [];
+    this.mutationRate = 0.01; // Adjust as necessary
+    this.geneLength = 0; // Will be set based on the number of objects
+  }
+
+  initializePopulation(geneLength) {
+    this.geneLength = geneLength;
+    this.population = this.createInitialPopulation();
+    this.fitnessScores = new Array(this.populationSize).fill(0);
+  }
+
+  createInitialPopulation() {
+    let population = [];
+    for (let i = 0; i < this.populationSize; i++) {
+      let individual = [];
+      for (let j = 0; j < this.geneLength; j++) {
+        individual.push(this.randomGene());
+      }
+      population.push(individual);
+    }
+    return population;
+  }
+
+  randomGene() {
+    return {
+      x: Math.random() * 2 - 1, // x between -1 and 1
+      y: -0.5, // y is fixed
+      z: Math.random(), // z between 0 and 1
+      rotation: Math.random() * 2 * Math.PI, // Rotation between 0 and 2π
+    };
+  }
+
+  async calculateFitness(imageData) {
+    for (let i = 0; i < this.populationSize; i++) {
+      // Calculate balance score
+      const score = await calculateBalanceScore(imageData);
+      this.fitnessScores[i] = score; // Assuming higher balance score means better fitness
+    }
+  }
+
+  selectParent() {
+    // Tournament selection
+    let tournamentSize = 3; // Adjust as necessary
+    let best = Math.floor(Math.random() * this.populationSize);
+    for (let i = 1; i < tournamentSize; i++) {
+      let ind = Math.floor(Math.random() * this.populationSize);
+      if (this.fitnessScores[ind] > this.fitnessScores[best]) {
+        best = ind;
+      }
+    }
+    return this.population[best];
+  }
+
+  crossover(parent1, parent2) {
+    let child = [];
+    let crossoverPoint = Math.floor(Math.random() * this.geneLength);
+    for (let i = 0; i < this.geneLength; i++) {
+      child[i] = i < crossoverPoint ? parent1[i] : parent2[i];
+    }
+    return child;
+  }
+
+  mutate(individual) {
+    return individual.map((gene) => {
+      if (Math.random() < this.mutationRate) {
+        return this.randomGene(); // Simple mutation: replace with a new random gene
+      }
+      return gene;
+    });
+  }
+
+  generateNextGeneration() {
+    let newPopulation = [];
+    for (let i = 0; i < this.populationSize; i++) {
+      let parent1 = this.selectParent();
+      let parent2 = this.selectParent();
+      let child = this.crossover(parent1, parent2);
+      child = this.mutate(child);
+      newPopulation.push(child);
+    }
+    this.population = newPopulation;
+    this.calculateFitness(); // Calculate fitness for the new population
+  }
+}
+
+// Export an instance of GeneticAlgorithm
+export const GA = new GeneticAlgorithm(100); // Example: A population size of 10
+
+balance.js
+export async function calculateBalanceScore(imageData) {
+  const { data, width, height } = imageData;
+
+  let leftDarkness = 0;
+  let rightDarkness = 0;
+  const totalPixels = width * height;
+
+  // Iterate over each pixel to calculate its darkness
+  for (let i = 0; i < totalPixels; i++) {
+    const index = i * 4;
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+
+    // Calculate the "darkness" of the pixel (simplified as inversely proportional to the average lightness)
+    const darkness = 255 - (r + g + b) / 3;
+
+    // Determine if the pixel is in the left or right half of the image
+    const xPosition = i % width;
+    if (xPosition < width / 2) {
+      leftDarkness += darkness;
+    } else {
+      rightDarkness += darkness;
+    }
+  }
+
+  // Calculate the balance score
+  // The score is higher when the darkness is similar on both sides
+  const maxDarkness = Math.max(leftDarkness, rightDarkness);
+  const minDarkness = Math.min(leftDarkness, rightDarkness);
+  const balanceScore = minDarkness / maxDarkness;
+
+  return balanceScore;
+}
+
+index.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Composition App</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="title">3D Composition App</h1>
+      <div class="upload-area">
+        <label for="fileInput" class="upload-label"
+          >Choose files to upload (or drag and drop them here)</label
+        >
+        <input
+          type="file"
+          id="fileInput"
+          accept=".gltf,.glb,.obj"
+          multiple
+          class="file-input"
+        />
+      </div>
+      <button id="optimizeBtn" class="optimize-btn">
+        Optimize Composition
+      </button>
+      <!-- Canvas container for the Three.js renderer -->
+      <div class="canvas-container"></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
+
+but when I run it I got this error:
+balance.js:2 Uncaught (in promise) TypeError: Cannot destructure property 'data' of 'imageData' as it is undefined.
+    at calculateBalanceScore (balance.js:2:11)
+    at GeneticAlgorithm.calculateFitness (decision_engine.js:42:47)
+    at GeneticAlgorithm.generateNextGeneration (decision_engine.js:88:10)
+    at HTMLButtonElement.startOptimization (app.js:142:8)
+
+can you provide me with the fix and the code please

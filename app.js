@@ -74,11 +74,6 @@ document
 const canvasContainer = document.querySelector(".canvas-container");
 canvasContainer.appendChild(renderer.domElement);
 
-function adjustObjectPositionAndRotation() {
-  // Placeholder for AI_artist function
-  // This function will iterate over 'objects' and adjust each object based on AI_artist's output
-}
-
 const light = new THREE.DirectionalLight(0xffffff, 3);
 light.position.set(-3, 2, 3);
 light.castShadow = true; // Enable shadow casting for the light
@@ -101,9 +96,25 @@ function render() {
 }
 render();
 
-window.objects = objects; // Make it accessible globally for debugging
+function captureWebGLPixelData() {
+  const width = renderer.domElement.width;
+  const height = renderer.domElement.height;
+  const pixels = new Uint8Array(width * height * 4); // 4 components per pixel
+  renderer
+    .getContext()
+    .readPixels(
+      0,
+      0,
+      width,
+      height,
+      renderer.getContext().RGBA,
+      renderer.getContext().UNSIGNED_BYTE,
+      pixels
+    );
+  return { data: pixels, width, height };
+}
 
-function startOptimization() {
+async function startOptimization() {
   const currentObjects = objects.map((obj) => {
     // Assuming 'objects' is an array holding your scene's objects
     return {
@@ -118,11 +129,25 @@ function startOptimization() {
   const geneLength = currentObjects.length;
   GA.initializePopulation(geneLength);
 
-  // Example: Run the GA for a fixed number of generations
-  const numberOfGenerations = 20; // You can adjust this number
+  render();
+
+  const imageData = captureWebGLPixelData();
+
+  const numberOfGenerations = 50; // You can adjust this number
   for (let i = 0; i < numberOfGenerations; i++) {
-    GA.calculateFitness();
-    GA.generateNextGeneration();
+    render(); // Make sure this renders the scene based on the current GA population
+    await GA.calculateFitness(imageData);
+
+    const bestSolution = GA.population[0]; // Assuming the first individual is the best
+    for (let i = 0; i < objects.length; i++) {
+      objects[i].position.x = bestSolution[i].x;
+      objects[i].position.y = bestSolution[i].y;
+      objects[i].position.z = bestSolution[i].z;
+      objects[i].rotation.y = bestSolution[i].rotation;
+    }
+    render();
+    const nextimgData = captureWebGLPixelData();
+    GA.generateNextGeneration(nextimgData);
   }
 
   // Apply the best solution from the GA to the scene objects
@@ -133,6 +158,6 @@ function startOptimization() {
     objects[i].position.z = bestSolution[i].z;
     objects[i].rotation.y = bestSolution[i].rotation;
   }
-
+  console.log(GA.fitnessScores[0]);
   render(); // Re-render the scene with updated object positions
 }

@@ -1,3 +1,5 @@
+import { calculateBalanceScore } from "./balance.js";
+
 class GeneticAlgorithm {
   constructor(populationSize) {
     this.populationSize = populationSize;
@@ -34,14 +36,11 @@ class GeneticAlgorithm {
     };
   }
 
-  calculateFitness() {
-    // Example fitness function that prefers objects to be on the right side
+  async calculateFitness(imageData) {
     for (let i = 0; i < this.populationSize; i++) {
-      let score = this.population[i].reduce(
-        (acc, gene) => acc + (gene.x > 0.2 ? 1 : 0),
-        0
-      );
-      this.fitnessScores[i] = score / this.geneLength; // Normalize score
+      // Calculate balance score
+      const score = await calculateBalanceScore(imageData);
+      this.fitnessScores[i] = score; // Assuming higher balance score means better fitness
     }
   }
 
@@ -76,7 +75,7 @@ class GeneticAlgorithm {
     });
   }
 
-  generateNextGeneration() {
+  generateNextGeneration(nextimgData) {
     let newPopulation = [];
     for (let i = 0; i < this.populationSize; i++) {
       let parent1 = this.selectParent();
@@ -86,9 +85,9 @@ class GeneticAlgorithm {
       newPopulation.push(child);
     }
     this.population = newPopulation;
-    this.calculateFitness(); // Calculate fitness for the new population
+    this.calculateFitness(nextimgData); // Calculate fitness for the new population
   }
 }
 
 // Export an instance of GeneticAlgorithm
-export const GA = new GeneticAlgorithm(10); // Example: A population size of 10
+export const GA = new GeneticAlgorithm(10);
