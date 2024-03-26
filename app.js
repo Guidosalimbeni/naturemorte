@@ -133,31 +133,34 @@ async function startOptimization() {
 
   const imageData = captureWebGLPixelData();
 
-  const numberOfGenerations = 50; // You can adjust this number
+  const numberOfGenerations = 200; // You can adjust this number
   for (let i = 0; i < numberOfGenerations; i++) {
     render(); // Make sure this renders the scene based on the current GA population
-    await GA.calculateFitness(imageData);
+    await GA.calculateFitness(imageData, currentObjects);
 
-    const bestSolution = GA.population[0]; // Assuming the first individual is the best
+    let tempSolution = GA.findBestIndividual(); // Assuming the first individual is the best
     for (let i = 0; i < objects.length; i++) {
-      objects[i].position.x = bestSolution[i].x;
-      objects[i].position.y = bestSolution[i].y;
-      objects[i].position.z = bestSolution[i].z;
-      objects[i].rotation.y = bestSolution[i].rotation;
+      objects[i].position.x = tempSolution[i].x;
+      objects[i].position.y = tempSolution[i].y;
+      objects[i].position.z = tempSolution[i].z;
+      objects[i].rotation.y = tempSolution[i].rotation;
     }
     render();
     const nextimgData = captureWebGLPixelData();
-    GA.generateNextGeneration(nextimgData);
+    GA.generateNextGeneration(nextimgData, currentObjects);
   }
 
   // Apply the best solution from the GA to the scene objects
-  const bestSolution = GA.population[0]; // Assuming the first individual is the best
+  // const bestSolution = GA.population[0]; // Assuming the first individual is the best
+  const bestSolution = GA.findBestIndividual();
+
   for (let i = 0; i < objects.length; i++) {
     objects[i].position.x = bestSolution[i].x;
     objects[i].position.y = bestSolution[i].y;
     objects[i].position.z = bestSolution[i].z;
     objects[i].rotation.y = bestSolution[i].rotation;
   }
-  console.log(GA.fitnessScores[0]);
+
   render(); // Re-render the scene with updated object positions
+  GA.printFinalScore();
 }

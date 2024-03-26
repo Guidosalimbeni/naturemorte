@@ -36,11 +36,11 @@ class GeneticAlgorithm {
     };
   }
 
-  async calculateFitness(imageData) {
+  async calculateFitness(imageData, currentObjects) {
     for (let i = 0; i < this.populationSize; i++) {
-      // Calculate balance score
-      const score = await calculateBalanceScore(imageData);
+      const score = await calculateBalanceScore(imageData, currentObjects);
       this.fitnessScores[i] = score; // Assuming higher balance score means better fitness
+      //   console.log(this.fitnessScores[i]);
     }
   }
 
@@ -75,7 +75,7 @@ class GeneticAlgorithm {
     });
   }
 
-  generateNextGeneration(nextimgData) {
+  generateNextGeneration(nextimgData, currentObjects) {
     let newPopulation = [];
     for (let i = 0; i < this.populationSize; i++) {
       let parent1 = this.selectParent();
@@ -85,9 +85,35 @@ class GeneticAlgorithm {
       newPopulation.push(child);
     }
     this.population = newPopulation;
-    this.calculateFitness(nextimgData); // Calculate fitness for the new population
+    this.calculateFitness(nextimgData, currentObjects); // Calculate fitness for the new population
+  }
+
+  findBestIndividual() {
+    let highestScoreIndex = 0;
+    let highestScore = this.fitnessScores[0];
+
+    for (let i = 1; i < this.populationSize; i++) {
+      if (this.fitnessScores[i] > highestScore) {
+        highestScore = this.fitnessScores[i];
+        highestScoreIndex = i;
+      }
+    }
+
+    return this.population[highestScoreIndex];
+  }
+
+  printFinalScore() {
+    let highestScore = this.fitnessScores[0];
+
+    for (let i = 1; i < this.populationSize; i++) {
+      if (this.fitnessScores[i] > highestScore) {
+        highestScore = this.fitnessScores[i];
+      }
+    }
+
+    console.log("final score: ", highestScore);
   }
 }
 
 // Export an instance of GeneticAlgorithm
-export const GA = new GeneticAlgorithm(10);
+export const GA = new GeneticAlgorithm(200);
