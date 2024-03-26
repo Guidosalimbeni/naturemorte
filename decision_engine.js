@@ -39,14 +39,22 @@ class GeneticAlgorithm {
   async calculateFitness(imageData, currentObjects) {
     for (let i = 0; i < this.populationSize; i++) {
       const score = await calculateBalanceScore(imageData, currentObjects);
-      this.fitnessScores[i] = score; // Assuming higher balance score means better fitness
-      //   console.log(this.fitnessScores[i]);
+      this.fitnessScores[i] = score;
+    }
+  }
+
+  getCurrentFitnessScore() {
+    let highestScore = this.fitnessScores[0];
+    for (let i = 1; i < this.populationSize; i++) {
+      if (this.fitnessScores[i] > highestScore) {
+        highestScore = this.fitnessScores[i];
+      }
+      return highestScore;
     }
   }
 
   selectParent() {
-    // Tournament selection
-    let tournamentSize = 3; // Adjust as necessary
+    let tournamentSize = 3;
     let best = Math.floor(Math.random() * this.populationSize);
     for (let i = 1; i < tournamentSize; i++) {
       let ind = Math.floor(Math.random() * this.populationSize);
@@ -75,7 +83,7 @@ class GeneticAlgorithm {
     });
   }
 
-  generateNextGeneration(nextimgData, currentObjects) {
+  async generateNextGeneration(nextimgData, currentObjects) {
     let newPopulation = [];
     for (let i = 0; i < this.populationSize; i++) {
       let parent1 = this.selectParent();
@@ -85,7 +93,7 @@ class GeneticAlgorithm {
       newPopulation.push(child);
     }
     this.population = newPopulation;
-    this.calculateFitness(nextimgData, currentObjects); // Calculate fitness for the new population
+    this.calculateFitness(nextimgData, currentObjects);
   }
 
   findBestIndividual() {
@@ -116,4 +124,4 @@ class GeneticAlgorithm {
 }
 
 // Export an instance of GeneticAlgorithm
-export const GA = new GeneticAlgorithm(200);
+export const GA = new GeneticAlgorithm(50);

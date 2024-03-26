@@ -15,7 +15,7 @@ export async function calculateBalanceScore(imageData, currentObjects) {
     // Calculate the "darkness" of the pixel (simplified as inversely proportional to the average lightness)
     let darkness = 0;
 
-    if (b <= 100) {
+    if (b <= 110) {
       darkness = 1;
     }
     // Determine if the pixel is in the left or right half of the image
@@ -33,7 +33,7 @@ export async function calculateBalanceScore(imageData, currentObjects) {
 
   return balanceScore + calculateSceneBalanceScore(currentObjects);
 }
-//
+//calculateSceneBalanceScore(currentObjects)
 function calculateSceneBalanceScore(currentObjects) {
   if (!currentObjects || currentObjects.length === 0) {
     return 0;
